@@ -1,0 +1,67 @@
+local _Players = game:GetService('Players')
+local _RunService = game:GetService('RunService')
+local _LocalPlayer = _Players.LocalPlayer
+local u4 = false
+local _ScreenGui = Instance.new('ScreenGui')
+
+_ScreenGui.Name = 'WERTIME_GUI'
+_ScreenGui.ResetOnSpawn = false
+_ScreenGui.Parent = _LocalPlayer:WaitForChild('PlayerGui')
+
+-- Khởi tạo Button
+local _TextButton = Instance.new('TextButton')
+_TextButton.Size = UDim2.new(0, 150, 0, 35) -- Kích thước nhỏ hơn
+_TextButton.Position = UDim2.new(0, 100, 0, 150)
+_TextButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Ruột đen
+_TextButton.TextColor3 = Color3.new(1, 1, 1)
+_TextButton.Font = Enum.Font.SourceSansBold
+_TextButton.TextSize = 14
+_TextButton.Text = 'WERTIME.Jump/OFF'
+_TextButton.Parent = _ScreenGui
+_TextButton.Draggable = true
+_TextButton.Active = true
+
+-- Bo góc
+local _UICorner = Instance.new('UICorner', _TextButton)
+_UICorner.CornerRadius = UDim.new(0, 6)
+
+-- Tạo viền LED (UIStroke)
+local _UIStroke = Instance.new('UIStroke', _TextButton)
+_UIStroke.Thickness = 2
+_UIStroke.Color = Color3.fromRGB(255, 0, 0) -- Mặc định đỏ
+_UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+local u8 = 'rbxassetid://6042053626'
+
+-- Hiệu ứng LED chớp nháy đổi màu liên tục (RGB)
+_RunService.RenderStepped:Connect(function()
+    local hue = tick() % 1 -- Tạo dải màu chuyển động theo thời gian
+    _UIStroke.Color = Color3.fromHSV(hue, 1, 1)
+end)
+
+local function v10()
+    u4 = not u4
+    _TextButton.Text = u4 and 'WERTIME.Jump/ON' or 'WERTIME.Jump/OFF'
+    
+    local _Sound = Instance.new('Sound', workspace)
+    _Sound.SoundId = u8
+    _Sound.Volume = 2
+    _Sound:Play()
+    game.Debris:AddItem(_Sound, 3)
+end
+
+_TextButton.MouseButton1Click:Connect(v10)
+
+_RunService.Heartbeat:Connect(function()
+    if u4 and _LocalPlayer.Character then
+        local _Humanoid = _LocalPlayer.Character:FindFirstChild('Humanoid')
+        local _Root = _LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
+
+        if _Humanoid and _Root then
+            local v13 = Ray.new(_Root.Position, Vector3.new(0, -4, 0))
+            if workspace:FindPartOnRay(v13, _LocalPlayer.Character) then
+                _Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end
+    end
+end)
