@@ -1,0 +1,143 @@
+--// SERVICES
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--// BIẾN HỆ THỐNG
+local SelectedTarget = nil
+local OrbitDist, OrbitSpeed, PredictVal = 5, 5, 0.15
+local CamLockDistance = 12
+local CamL, FlashOrbit = false, false
+local FlashSpeed, LastFlash, FlashIndex = 10, 0, 1
+local PosMode = 1
+local Modes = {"ORBIT", "FRONT", "BEHIND", "LEFT", "RIGHT", "ABOVE", "BELOW"}
+local CamRotX, CamRotY = 0, 0
+local dragSensitivity = 0.007
+
+-- // NƠI CHỨA UI //
+local TargetParent = (gethui and gethui()) or (game:GetService("CoreGui")) or (LocalPlayer:WaitForChild("PlayerGui"))
+if TargetParent:FindFirstChild("WERTIME_ULTIMATE") then TargetParent.WERTIME_ULTIMATE:Destroy() end
+local ScreenGui = Instance.new("ScreenGui", TargetParent); ScreenGui.Name = "WERTIME_ULTIMATE"; ScreenGui.ResetOnSpawn = false
+
+-- // HÀM KÉO DRAGGABLE (PC & MOBILE) //
+local function MakeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    gui.InputBegan:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- // UI: LOGO //
+local Logo = Instance.new("ImageButton", ScreenGui); Logo.Size = UDim2.new(0, 50, 0, 50); Logo.Position = UDim2.new(0, 10, 0, 10); Logo.BackgroundColor3 = Color3.new(0,0,0); Logo.Image = "rbxassetid://138671158580040"; Instance.new("UICorner", Logo).CornerRadius = UDim.new(1,0); MakeDraggable(Logo)
+
+-- // UI: MAIN MENU //
+local Main = Instance.new("Frame", ScreenGui); Main.Size = UDim2.new(0, 200, 0, 460); Main.Position = UDim2.new(0.5, -100, 0.5, -230); Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Main.Visible = true; Instance.new("UICorner", Main); MakeDraggable(Main)
+Logo.MouseButton1Click:Connect(function() Main.Visible = not Main.Visible end)
+
+-- // UI: PLAYER LIST //
+local ListF = Instance.new("Frame", ScreenGui); ListF.Size = UDim2.new(0, 210, 0, 300); ListF.Position = UDim2.new(0.5, 120, 0.5, -150); ListF.BackgroundColor3 = Color3.fromRGB(15, 15, 15); ListF.Visible = false; Instance.new("UICorner", ListF); MakeDraggable(ListF)
+local Scroll = Instance.new("ScrollingFrame", ListF); Scroll.Size = UDim2.new(0.9, 0, 0.8, 0); Scroll.Position = UDim2.new(0.05, 0, 0.15, 0); Scroll.BackgroundTransparency = 1; Scroll.AutomaticCanvasSize = "Y"; Instance.new("UIListLayout", Scroll).Padding = UDim.new(0, 5)
+local CloseList = Instance.new("TextButton", ListF); CloseList.Size = UDim2.new(0, 30, 0, 30); CloseList.Position = UDim2.new(1, -35, 0, 5); CloseList.Text = "X"; CloseList.BackgroundColor3 = Color3.new(0.6, 0, 0); CloseList.TextColor3 = Color3.new(1,1,1); CloseList.MouseButton1Click:Connect(function() ListF.Visible = false end)
+
+-- // UI HELPERS //
+local function AddInput(txt, y, val, cb)
+    local l = Instance.new("TextLabel", Main); l.Size = UDim2.new(0.5, 0, 0, 20); l.Position = UDim2.new(0.05, 0, 0, y); l.Text = txt; l.TextColor3 = Color3.new(1,1,1); l.BackgroundTransparency = 1; l.TextSize = 10; l.Font = "GothamBold"; l.TextXAlignment = "Left"
+    local b = Instance.new("TextBox", Main); b.Size = UDim2.new(0, 65, 0, 22); b.Position = UDim2.new(0.6, 0, 0, y); b.Text = tostring(val); b.BackgroundColor3 = Color3.fromRGB(45,45,45); b.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", b)
+    b.FocusLost:Connect(function() cb(tonumber(b.Text) or val) end)
+end
+
+local function AddToggle(txt, y, cb)
+    local st = false
+    local btn = Instance.new("TextButton", Main); btn.Size = UDim2.new(0.9, 0, 0, 32); btn.Position = UDim2.new(0.05, 0, 0, y); btn.Text = txt .. ": OFF"; btn.BackgroundColor3 = Color3.fromRGB(40,40,40); btn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", btn)
+    btn.MouseButton1Click:Connect(function() st = not st; btn.Text = txt .. (st and ": ON" or ": OFF"); btn.BackgroundColor3 = st and Color3.fromRGB(0,120,0) or Color3.fromRGB(40,40,40); cb(st) end)
+end
+
+-- // SETUP CONTROLS //
+AddInput("STUD DIST", 15, OrbitDist, function(v) OrbitDist = v end)
+AddInput("PREDICT", 45, PredictVal, function(v) PredictVal = v end)
+AddInput("CAM DIST", 75, CamLockDistance, function(v) CamLockDistance = v end)
+AddInput("FLASH SPD", 105, FlashSpeed, function(v) FlashSpeed = v end)
+AddInput("ROTATE X", 135, 0, function(v) CamRotX = math.rad(v) end)
+AddInput("ROTATE Y", 165, 0, function(v) CamRotY = math.rad(v) end)
+
+AddToggle("CAM LOCK", 200, function(v) CamL = v if not v then Camera.CameraType = "Custom" end end)
+AddToggle("FLASH 6 HƯỚNG", 240, function(v) FlashOrbit = v end)
+
+local ModeBtn = Instance.new("TextButton", Main); ModeBtn.Size = UDim2.new(0.9, 0, 0, 35); ModeBtn.Position = UDim2.new(0.05, 0, 0, 285); ModeBtn.Text = "MODE: " .. Modes[PosMode]; ModeBtn.BackgroundColor3 = Color3.fromRGB(60,60,60); ModeBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", ModeBtn)
+ModeBtn.MouseButton1Click:Connect(function() PosMode = (PosMode % #Modes) + 1; ModeBtn.Text = "MODE: " .. Modes[PosMode] end)
+
+local TargetBtn = Instance.new("TextButton", Main); TargetBtn.Size = UDim2.new(0.9, 0, 0, 35); TargetBtn.Position = UDim2.new(0.05, 0, 0, 330); TargetBtn.Text = "SELECT TARGET"; TargetBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100); TargetBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", TargetBtn)
+TargetBtn.MouseButton1Click:Connect(function() ListF.Visible = not ListF.Visible end)
+
+-- // PLAYER LIST LOGIC //
+local function UpdateList()
+    for _,v in pairs(Scroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    for _,p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local f = Instance.new("Frame", Scroll); f.Size = UDim2.new(1, -10, 0, 50); f.BackgroundColor3 = Color3.fromRGB(40,40,40); Instance.new("UICorner", f)
+            local img = Instance.new("ImageLabel", f); img.Size = UDim2.new(0, 40, 0, 40); img.Position = UDim2.new(0, 5, 0.5, -20); img.Image = Players:GetUserThumbnailAsync(p.UserId, "HeadShot", "Size48x48"); Instance.new("UICorner", img).CornerRadius = UDim.new(1,0)
+            local name = Instance.new("TextLabel", f); name.Size = UDim2.new(1, -55, 0, 40); name.Position = UDim2.new(0, 50, 0, 5); name.Text = p.DisplayName; name.TextColor3 = Color3.new(1,1,1); name.BackgroundTransparency = 1; name.TextXAlignment = "Left"; name.Font = "GothamBold"
+            local b = Instance.new("TextButton", f); b.Size = UDim2.new(1,0,1,0); b.BackgroundTransparency = 1; b.Text = ""; b.MouseButton1Click:Connect(function() SelectedTarget = p; ListF.Visible = false end)
+        end
+    end
+end
+UpdateList(); Players.PlayerAdded:Connect(UpdateList); Players.PlayerRemoving:Connect(UpdateList)
+
+-- // CAMERA CONTROL (PC & MOBILE) //
+UserInputService.InputChanged:Connect(function(input)
+    if CamL and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if not UserInputService:GetFocusedTextBox() then
+            local delta = input.Delta
+            CamRotX = CamRotX - delta.X * dragSensitivity
+            CamRotY = math.clamp(CamRotY - delta.Y * dragSensitivity, -math.rad(80), math.rad(80))
+        end
+    end
+end)
+
+-- // MAIN LOOP //
+RunService.Heartbeat:Connect(function()
+    if SelectedTarget and SelectedTarget.Character and SelectedTarget.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local tP = SelectedTarget.Character.HumanoidRootPart
+        if not hrp then return end
+
+        local tPos = tP.Position + (tP.Velocity * PredictVal)
+        local finalPos
+        
+        if FlashOrbit then
+            if tick() - LastFlash > (1/FlashSpeed) then FlashIndex = (FlashIndex % 6) + 1; LastFlash = tick() end
+            local dirs = {CFrame.new(0,0,OrbitDist), CFrame.new(0,0,-OrbitDist), CFrame.new(-OrbitDist,0,0), CFrame.new(OrbitDist,0,0), CFrame.new(0,OrbitDist,0), CFrame.new(0,-OrbitDist,0)}
+            finalPos = (tP.CFrame * dirs[FlashIndex]).Position
+        else
+            if Modes[PosMode] == "ORBIT" then
+                local t = tick() * OrbitSpeed; finalPos = tPos + Vector3.new(math.cos(t)*OrbitDist, 0, math.sin(t)*OrbitDist)
+            elseif Modes[PosMode] == "FRONT" then finalPos = (tP.CFrame * CFrame.new(0,0,-OrbitDist)).Position
+            elseif Modes[PosMode] == "BEHIND" then finalPos = (tP.CFrame * CFrame.new(0,0,OrbitDist)).Position
+            elseif Modes[PosMode] == "LEFT" then finalPos = (tP.CFrame * CFrame.new(-OrbitDist,0,0)).Position
+            elseif Modes[PosMode] == "RIGHT" then finalPos = (tP.CFrame * CFrame.new(OrbitDist,0,0)).Position
+            elseif Modes[PosMode] == "ABOVE" then finalPos = (tP.CFrame * CFrame.new(0,OrbitDist,0)).Position
+            elseif Modes[PosMode] == "BELOW" then finalPos = (tP.CFrame * CFrame.new(0,-OrbitDist,0)).Position
+            end
+        end
+        
+        hrp.CFrame = CFrame.lookAt(finalPos, tPos)
+        if CamL then
+            Camera.CameraType = Enum.CameraType.Scriptable
+            local baseRot = CFrame.Angles(0, CamRotX, 0) * CFrame.Angles(CamRotY, 0, 0)
+            Camera.CFrame = CFrame.new(tPos) * baseRot * CFrame.new(0, 2, CamLockDistance)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, tPos)
+        end
+    end
+end)
