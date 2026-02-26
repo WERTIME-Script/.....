@@ -1,0 +1,160 @@
+-- AIR WALK TRUE GROUND (NO INFINITE JUMP)
+-- WERTIME RGB FADE EDITION
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+
+local char, humanoid, root
+local platform
+local baseY
+local offsetY = -3.2
+local conn
+
+local function setup()
+	char = player.Character or player.CharacterAdded:Wait()
+	humanoid = char:WaitForChild("Humanoid")
+	root = char:WaitForChild("HumanoidRootPart")
+end
+
+setup()
+player.CharacterAdded:Connect(setup)
+
+-- UI
+local gui = Instance.new("ScreenGui", player.PlayerGui)
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0,150,0,110)
+frame.Position = UDim2.new(0,20,0,200)
+frame.BackgroundColor3 = Color3.fromRGB(15,15,15)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.ClipsDescendants = false
+
+-- ===== RAINBOW BORDER =====
+local stroke = Instance.new("UIStroke", frame)
+stroke.Thickness = 3
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+-- ===== LED GLOW =====
+local glow = Instance.new("ImageLabel", frame)
+glow.Size = UDim2.new(1,30,1,30)
+glow.Position = UDim2.new(0,-15,0,-15)
+glow.BackgroundTransparency = 1
+glow.Image = "rbxassetid://5028857084"
+glow.ImageTransparency = 0.55
+glow.ScaleType = Enum.ScaleType.Slice
+glow.SliceCenter = Rect.new(24,24,276,276)
+glow.ZIndex = 0
+
+-- ===== TITLE RGB FADE =====
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,25)
+title.BackgroundColor3 = Color3.fromRGB(20,20,20)
+title.BorderSizePixel = 0
+title.Text = "WERTIME"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.TextStrokeTransparency = 0.4
+
+-- ===== BUTTON CREATOR =====
+local function btn(text,y)
+	local b = Instance.new("TextButton", frame)
+	b.Size = UDim2.new(1,-16,0,28)
+	b.Position = UDim2.new(0,8,0,y)
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.Text = text
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.SourceSans
+	b.TextSize = 14
+	return b
+end
+
+local saveBtn = btn("SAVE HEIGHT",36)
+local resetBtn = btn("RESET",70)
+
+-- ===== CLICK SOUND =====
+local clickSound = Instance.new("Sound", frame)
+clickSound.SoundId = "rbxassetid://12221967"
+clickSound.Volume = 1
+
+-- ===== ANIMATION OPEN =====
+local originalSize = frame.Size
+frame.Size = UDim2.new(0,0,0,0)
+
+TweenService:Create(frame,
+	TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+	{Size = originalSize}
+):Play()
+
+-- ===== RAINBOW + FADE LOOP =====
+RunService.RenderStepped:Connect(function()
+	local t = tick()
+
+	-- Border + Glow rainbow
+	local hueBorder = (t % 5) / 5
+	local borderColor = Color3.fromHSV(hueBorder,1,1)
+	stroke.Color = borderColor
+	glow.ImageColor3 = borderColor
+
+	-- Title rainbow
+	local hueText = (t % 4) / 4
+	title.TextColor3 = Color3.fromHSV(hueText,1,1)
+
+	-- Fade in/out mượt
+	local alpha = (math.sin(t * 2) + 1) / 2
+	title.TextTransparency = 0.2 + (alpha * 0.6)
+end)
+
+-- =========================
+-- ===== LOGIC GIỮ NGUYÊN =====
+-- =========================
+
+local function start()
+	if platform then return end
+
+	baseY = root.Position.Y + offsetY
+
+	platform = Instance.new("Part")
+	platform.Size = Vector3.new(12,1,12)
+	platform.Anchored = true
+	platform.CanCollide = true
+	platform.Transparency = 1
+	platform.Parent = workspace
+
+	conn = RunService.Heartbeat:Connect(function()
+		if not (root and humanoid and platform) then return end
+
+		local state = humanoid:GetState()
+
+		platform.Position = Vector3.new(
+			root.Position.X,
+			baseY,
+			root.Position.Z
+		)
+
+		if state == Enum.HumanoidStateType.Landed then
+			baseY = root.Position.Y + offsetY
+		end
+	end)
+end
+
+local function reset()
+	if conn then conn:Disconnect() conn = nil end
+	if platform then platform:Destroy() platform = nil end
+	baseY = nil
+end
+
+saveBtn.MouseButton1Click:Connect(function()
+	clickSound:Play()
+	start()
+end)
+
+resetBtn.MouseButton1Click:Connect(function()
+	clickSound:Play()
+	reset()
+end)
