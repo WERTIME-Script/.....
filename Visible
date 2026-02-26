@@ -1,0 +1,102 @@
+-- WerTime Invisible | Drag FIX chắc chắn
+
+if _G.a then
+    for _,v in pairs(_G.a) do
+        pcall(function() v:Disconnect() end)
+    end
+    _G.a = nil
+end
+
+repeat task.wait() until game.Players.LocalPlayer
+local LP = game.Players.LocalPlayer
+local RS = game:GetService("RunService")
+
+local char, hum, hrp
+local enabled = false
+local parts = {}
+
+local function setupChar()
+    char = LP.Character or LP.CharacterAdded:Wait()
+    hum = char:WaitForChild("Humanoid")
+    hrp = char:WaitForChild("HumanoidRootPart")
+    parts = {}
+
+    for _,v in pairs(char:GetDescendants()) do
+        if v:IsA("BasePart") and v.Transparency == 0 then
+            table.insert(parts, v)
+        end
+    end
+end
+
+-- ===== UI =====
+local gui = Instance.new("ScreenGui")
+gui.ResetOnSpawn = false
+gui.Parent = LP:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromOffset(150, 80)
+frame.Position = UDim2.fromScale(0.5, 0.2)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Active = true
+frame.Draggable = true -- ✅ FIX KÉO
+
+local stroke = Instance.new("UIStroke", frame)
+stroke.Thickness = 2
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1,0,0,22)
+title.BackgroundColor3 = Color3.fromRGB(30,30,30)
+title.Text = "WerTime"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 13
+title.TextColor3 = Color3.fromRGB(230,230,230)
+
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.fromOffset(120, 30)
+btn.Position = UDim2.fromOffset(15, 38)
+btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
+btn.TextColor3 = Color3.fromRGB(255,255,255)
+btn.TextSize = 12
+btn.Font = Enum.Font.Gotham
+btn.Text = "Invisible : OFF"
+
+-- viền cầu vồng
+RS.RenderStepped:Connect(function()
+    stroke.Color = Color3.fromHSV((tick()%5)/5,1,1)
+end)
+
+btn.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    btn.Text = enabled and "Invisible : ON" or "Invisible : OFF"
+
+    for _,v in pairs(parts) do
+        v.Transparency = enabled and 0.5 or 0
+    end
+end)
+
+-- ===== INVISIBLE LOGIC (GIỮ NGUYÊN) =====
+local conns = {}
+
+conns[1] = RS.Heartbeat:Connect(function()
+    if enabled and hrp and hum then
+        local cf = hrp.CFrame
+        local cam = hum.CameraOffset
+
+        local down = cf * CFrame.new(0, -200000, 0)
+        hrp.CFrame = down
+        hum.CameraOffset = (down:ToObjectSpace(CFrame.new(cf.Position))).Position
+
+        RS.RenderStepped:Wait()
+
+        hrp.CFrame = cf
+        hum.CameraOffset = cam
+    end
+end)
+
+LP.CharacterAdded:Connect(function()
+    enabled = false
+    setupChar()
+end)
+
+setupChar()
+_G.a = conns
