@@ -1,0 +1,146 @@
+local Players         = game:GetService("Players")
+local RunService      = game:GetService("RunService")
+local UIS              = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local LP               = Players.LocalPlayer
+
+-- [[ SETTINGS - CHUẨN TÍN V45 ]] --
+_G.Enabled             = false
+_G.TrimpOn             = false 
+_G.FlatTrimp           = false 
+_G.Backward            = false 
+_G.TP_Speed            = 200
+_G.Angle               = 1.5
+_G.ShowLagButton       = true
+_G.FreezeTime          = 0.05 
+_G.BigOffset           = 5.0    
+local autoJump         = false
+local isFreezing       = false
+local MainColor        = Color3.fromRGB(0, 255, 150)
+local TextColor        = Color3.fromRGB(0, 200, 120)
+
+-- [[ DỌN DẸP GUI ]] --
+local Parent = (game:GetService("CoreGui"):FindFirstChild("RobloxGui") or LP:WaitForChild("PlayerGui"))
+if Parent:FindFirstChild("STAR_V45_ULTIMATE") then Parent:FindFirstChild("STAR_V45_ULTIMATE"):Destroy() end
+local gui = Instance.new("ScreenGui", Parent); gui.Name = "STAR_V45_ULTIMATE"
+
+---------------------------------------------------------
+-- [ LOGIC KÉO CHUẨN - KHÔNG LỖI ]
+---------------------------------------------------------
+local function Drag(obj, target)
+    local dragging, dragInput, dragStart, startPos
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; dragStart = input.Position; startPos = target.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    obj.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            target.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+---------------------------------------------------------
+-- [ UI BUILDER ]
+---------------------------------------------------------
+local function CreateMenu(name, pos, sizeY)
+    local isMin = false
+    local Main = Instance.new("Frame", gui); Main.Size = UDim2.new(0, 200, 0, sizeY); Main.Position = pos; Main.BackgroundColor3 = Color3.new(0,0,0); Main.BackgroundTransparency = 0.5; Main.Active = true; Instance.new("UIStroke", Main).Color = MainColor; Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+    local TitleBar = Instance.new("Frame", Main); TitleBar.Size = UDim2.new(1, 0, 0, 32); TitleBar.BackgroundTransparency = 1; TitleBar.Active = true; Drag(TitleBar, Main)
+    local TitleText = Instance.new("TextLabel", TitleBar); TitleText.Size = UDim2.new(1, -35, 1, 0); TitleText.Text = "  "..name; TitleText.TextColor3 = MainColor; TitleText.Font = Enum.Font.Code; TitleText.TextSize = 11; TitleText.BackgroundTransparency = 1; TitleText.TextXAlignment = 0
+    local Content = Instance.new("Frame", Main); Content.Size = UDim2.new(1, 0, 1, -35); Content.Position = UDim2.new(0, 0, 0, 35); Content.BackgroundTransparency = 1; Content.ClipsDescendants = true; Instance.new("UIListLayout", Content).Padding = UDim.new(0, 6); Instance.new("UIListLayout", Content).HorizontalAlignment = 1
+    local MinBtn = Instance.new("TextButton", TitleBar); MinBtn.Size = UDim2.new(0, 30, 0, 25); MinBtn.Position = UDim2.new(1, -32, 0, 3); MinBtn.Text = "[-]"; MinBtn.TextColor3 = MainColor; MinBtn.BackgroundTransparency = 1; MinBtn.Font = Enum.Font.Code; MinBtn.Modal = true
+    MinBtn.MouseButton1Click:Connect(function()
+        isMin = not isMin
+        TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = isMin and UDim2.new(0, 200, 0, 32) or UDim2.new(0, 200, 0, sizeY)}):Play()
+        Content.Visible = not isMin; MinBtn.Text = isMin and "[+]" or "[-]"
+    end)
+    return Content
+end
+
+local function AddSwitch(p, t, pr, isJump)
+    local f = Instance.new("Frame", p); f.Size = UDim2.new(0.92, 0, 0, 25); f.BackgroundTransparency = 1
+    local l = Instance.new("TextLabel", f); l.Size = UDim2.new(0.65, 0, 1, 0); l.Text = "> "..t; l.TextColor3 = MainColor; l.Font = Enum.Font.Code; l.TextSize = 10; l.BackgroundTransparency = 1; l.TextXAlignment = 0
+    local sw = Instance.new("TextButton", f); sw.Size = UDim2.new(0, 35, 0, 16); sw.Position = UDim2.new(1, -40, 0.5, -8); sw.BackgroundColor3 = Color3.new(0,0,0); sw.Text = ""; sw.Modal = true; Instance.new("UICorner", sw).CornerRadius = UDim.new(1, 0)
+    local st = Instance.new("UIStroke", sw); st.Color = MainColor
+    local c = Instance.new("Frame", sw); c.Size = UDim2.new(0, 12, 0, 12); c.Position = UDim2.new(0, 2, 0.5, -6); c.BackgroundColor3 = MainColor; Instance.new("UICorner", c).CornerRadius = UDim.new(1, 0)
+    local function up() 
+        local v = (isJump and autoJump) or _G[pr]
+        c.Position = v and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6); c.BackgroundTransparency = v and 0 or 0.7
+        if pr == "ShowLagButton" then if gui:FindFirstChild("LagFrame") then gui.LagFrame.Visible = _G.ShowLagButton end end
+    end
+    sw.MouseButton1Click:Connect(function() if isJump then autoJump = not autoJump else _G[pr] = not _G[pr] end up() end); up()
+end
+
+local function AddBox(p, t, pr)
+    local f = Instance.new("Frame", p); f.Size = UDim2.new(0.92, 0, 0, 25); f.BackgroundTransparency = 1
+    local l = Instance.new("TextLabel", f); l.Size = UDim2.new(0.65, 0, 1, 0); l.Text = "> "..t; l.TextColor3 = MainColor; l.Font = Enum.Font.Code; l.TextSize = 10; l.BackgroundTransparency = 1; l.TextXAlignment = 0
+    local b = Instance.new("TextBox", f); b.Size = UDim2.new(0, 45, 0, 18); b.Position = UDim2.new(1, -50, 0.5, -9); b.Text = tostring(_G[pr]); b.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1); b.TextColor3 = TextColor; b.Font = Enum.Font.Code; b.TextSize = 10; Instance.new("UIStroke", b).Color = MainColor; b.FocusLost:Connect(function() _G[pr] = tonumber(b.Text) or _G[pr] end)
+end
+
+-- STATS MENU
+local StatsContent = CreateMenu("MONITOR STATS", UDim2.new(0.05, 0, 0.45, 0), 125)
+local function AddStat(p) local l = Instance.new("TextLabel", p); l.Size = UDim2.new(0.9, 0, 0, 18); l.BackgroundTransparency = 1; l.TextColor3 = TextColor; l.Font = Enum.Font.Code; l.TextSize = 10; l.TextXAlignment = 0; return l end
+local PosXLabel = AddStat(StatsContent); local PosYLabel = AddStat(StatsContent); local PosZLabel = AddStat(StatsContent); local VelLabel = AddStat(StatsContent); local FpsLabel = AddStat(StatsContent)
+
+-- CONTROL MENU
+local c1 = CreateMenu("STAR CONTROL", UDim2.new(0.05, 0, 0.1, 0), 135); AddSwitch(c1, "WALK", "Enabled"); AddSwitch(c1, "BACK", "Backward"); AddBox(c1, "SPD", "TP_Speed")
+local c2 = CreateMenu("STAR SETTINGS", UDim2.new(0.7, 0, 0.1, 0), 250); AddSwitch(c2, "TRIMP (FREEZE)", "TrimpOn"); AddSwitch(c2, "FLAT TRIMP", "FlatTrimp"); AddSwitch(c2, "AUTO JUMP", nil, true); AddSwitch(c2, "SHOW STAR", "ShowLagButton"); AddBox(c2, "ANGLE", "Angle"); AddBox(c2, "FREEZE", "FreezeTime")
+
+-- STAR-LAG BUTTON (FIXED DRAG & CENTER)
+local LagFrame = Instance.new("Frame", gui); LagFrame.Name = "LagFrame"; LagFrame.Size = UDim2.new(0, 160, 0, 50); LagFrame.Position = UDim2.new(0.5, -80, 0.8, 0); LagFrame.BackgroundColor3 = Color3.new(0,0,0); LagFrame.BackgroundTransparency = 0.5; LagFrame.Active = true; Instance.new("UIStroke", LagFrame).Color = MainColor; Instance.new("UICorner", LagFrame).CornerRadius = UDim.new(0, 10)
+local LagHandle = Instance.new("Frame", LagFrame); LagHandle.Size = UDim2.new(1, 0, 1, 0); LagHandle.BackgroundTransparency = 1; LagHandle.Active = true; Drag(LagHandle, LagFrame)
+local LagBtn = Instance.new("TextLabel", LagFrame); LagBtn.Size = UDim2.new(1, 0, 1, 0); LagBtn.BackgroundTransparency = 1; LagBtn.Text = "STAR-LAG"; LagBtn.TextColor3 = MainColor; LagBtn.Font = Enum.Font.Code; LagBtn.TextSize = 18; LagBtn.ZIndex = 2
+local RealClick = Instance.new("TextButton", LagFrame); RealClick.Size = UDim2.new(1, 0, 1, 0); RealClick.BackgroundTransparency = 1; RealClick.Text = ""; RealClick.Modal = true
+RealClick.MouseButton1Click:Connect(function() 
+    local gc = getgc(true); local st = tick(); while tick()-st < 1 do for i=1,85 do pcall(function() for _,o in ipairs(gc) do if typeof(o)=="table" and rawget(o,"Speed")~=nil then o.Speed=0; o.JumpCap=0 end end end) end task.wait(0.01) end
+end)
+
+---------------------------------------------------------
+-- [ CORE LOGIC: ANTI-CLIP & TRIMP ]
+---------------------------------------------------------
+local lastTrimp = 0; local frameCount = 0; local lastUpdate = tick()
+RunService.Heartbeat:Connect(function(dt)
+    local char = LP.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    -- MONITOR
+    frameCount = frameCount + 1; if tick()-lastUpdate >= 1 then FpsLabel.Text = " FPS: "..frameCount; frameCount = 0; lastUpdate = tick() end
+    PosXLabel.Text = string.format(" X: %.2f", hrp.Position.X); PosYLabel.Text = string.format(" Y: %.2f", hrp.Position.Y); PosZLabel.Text = string.format(" Z: %.2f", hrp.Position.Z); VelLabel.Text = string.format(" SPD: %.1f", hrp.Velocity.Magnitude)
+
+    if isFreezing then return end
+    local cam = workspace.CurrentCamera
+    local moveDir = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z).Unit
+    if _G.Backward then moveDir = -moveDir end
+    
+    -- AUTO JUMP (7.2 STUDS)
+    if autoJump and hum.FloorMaterial ~= Enum.Material.Air then hum:ChangeState(3); hrp.Velocity = Vector3.new(hrp.Velocity.X, 40, hrp.Velocity.Z) end
+
+    -- ANTI-WALL CLIP
+    local rayParam = RaycastParams.new(); rayParam.FilterDescendantsInstances = {char}; rayParam.FilterType = Enum.RaycastFilterType.Blacklist
+    local wallCheck = workspace:Raycast(hrp.Position, moveDir * 3, rayParam)
+    
+    -- TRIMP (ONLY IF WALK ENABLED)
+    if _G.TrimpOn and _G.Enabled then
+        local floor = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), rayParam)
+        if (floor or _G.FlatTrimp) and (tick()-lastTrimp) > 0.45 then
+            lastTrimp = tick(); isFreezing = true; hrp.Anchored = true; task.wait(_G.FreezeTime)
+            local hBoost = _G.TP_Speed/11; local vBoost = 35 + (_G.TP_Speed * 0.012)
+            if _G.FlatTrimp then vBoost = vBoost * 0.88 end
+            hrp.CFrame = hrp.CFrame + ((moveDir + Vector3.new(0, _G.Angle, 0)).Unit * _G.BigOffset)
+            task.wait(0.01); hrp.Anchored = false; isFreezing = false
+            hrp.Velocity = (moveDir * hBoost * 6.5) + Vector3.new(0, vBoost, 0); hum:ChangeState(3)
+        end
+    end
+    
+    -- TP WALK WITH ANTI-CLIP
+    if _G.Enabled and not wallCheck then 
+        hrp.CFrame = hrp.CFrame + (moveDir * (_G.TP_Speed * dt * 0.15)) 
+    end
+end)
